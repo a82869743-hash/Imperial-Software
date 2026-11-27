@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Order tracking · Imperial</title>
+<link rel="icon" href="/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#1d5fc4;--blue-600:#174fa6;--blue-50:#eef4fd;--ink:#1c2633;--muted:#6b7a8f;--line:#e8edf3;--green:#1a9a5b}
+*{box-sizing:border-box}
+body{margin:0;background:#f7f9fc;color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-size:15px}
+main{max-width:520px;margin:0 auto;padding:28px 18px 40px;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--blue-600);font-size:18px}
+.brand img{width:36px;height:36px;object-fit:contain}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px}
+.muted{color:var(--muted);font-size:13px}
+h1{margin:6px 0 0;font-size:22px;letter-spacing:-.02em}
+.bar{height:8px;border-radius:6px;background:#eef2f7;overflow:hidden;margin-top:14px}
+.bar i{display:block;height:100%;background:var(--blue)}
+ol{list-style:none;margin:0;padding:0}
+li{display:flex;gap:14px;padding:0 0 18px;position:relative}
+li:last-child{padding-bottom:0}
+li:not(:last-child):before{content:'';position:absolute;left:10px;top:24px;bottom:2px;width:2px;background:var(--line)}
+.dot{width:22px;height:22px;border-radius:50%;border:1.5px solid #c3ccd8;flex:none;background:#fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;z-index:1}
+.done .dot{background:var(--green);border-color:var(--green)}
+.done:not(:last-child):before{background:var(--green)}
+.cur .dot{border:6px solid #dbe8fb;background:var(--blue)}
+.cur b{color:var(--blue-600)}
+.todo b{color:var(--muted);font-weight:500}
+.note{background:#f5f9ff;border:1px solid #dbe8fb;border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.5}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.photos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="/logo.webp" alt="">imperial</div>
+  <div id="out" class="card"><span class="muted">Loading your order…</span></div>
+</main>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const token = location.pathname.split('/').pop();
+fetch('/api/track/' + encodeURIComponent(token)).then(r => r.ok ? r.json() : Promise.reject()).then(t => {
+  const pct = Math.round((t.stage + (t.dispatched ? 1 : 0.5)) / t.stages.length * 100);
+  const when = t.expected ? new Date(t.expected).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
+  document.querySelector('main').innerHTML = `
+    <div class="brand"><img src="/logo.webp" alt="">imperial</div>
+    <div class="card">
+      <div class="muted">Order ${esc(t.order)} · ${esc(t.client)}</div>
+      <h1>${t.dispatched ? 'Dispatched' : esc(t.stages[t.stage])}</h1>
+      <div class="muted" style="margin-top:6px">${esc(t.product)} · ${esc(t.qty)}</div>
+      ${t.dispatched ? '' : `<p style="margin:14px 0 0">Expected dispatch <b>${when}</b></p>`}
+      <div class="bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+    </div>
+    <div class="card"><ol>${t.stages.map((s, i) => {
+      const cls = i < t.stage || t.dispatched ? 'done' : i === t.stage ? 'cur' : 'todo';
+      return `<li class="${cls}"><span class="dot">${cls === 'done' ? '✓' : ''}</span><div><b>${esc(s)}</b></div></li>`;
+    }).join('')}</ol></div>
+    ${t.note ? `<div class="note"><b>Note from Imperial:</b> ${esc(t.note)}</div>` : ''}
+    ${t.photos.length ? `<div class="card"><b>Dispatch photos</b><div class="photos" style="margin-top:12px">${t.photos.map(p => `<img src="${esc(p)}" alt="Dispatch photo">`).join('')}</div></div>` : ''}`;
+}).catch(() => { document.getElementById('out').innerHTML = '<b>This tracking link is not valid.</b><p class="muted">Please check the link or contact Imperial.</p>'; });
+</script>
+</body>
+</html>

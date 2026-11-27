@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "imperial", "runtimeExecutable": "node", "runtimeArgs": ["server.js"], "port": 3000, "autoPort": false, "env": { "ADMIN_PASSWORD": "admin-test-123" } }
+  ]
+}
