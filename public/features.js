@@ -499,23 +499,37 @@ PAGES.dashboard = () => {
   const hr = new Date().getHours(), hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
   const ship = wos.filter(w => w.stage < lastStage(w)).sort((a, b) => (a.expected || '').localeCompare(b.expected || '')).slice(0, 5);
   setTimeout(() => countUp($('#view')), 0);
+  const kpi = (href, ic, label, val, fmt, foot, extra = '') => `<a class="card kpi3" href="${href}"><div class="kh"><span class="ki"><i data-lucide="${ic}"></i></span><span class="l">${label}</span><i data-lucide="arrow-up-right" class="go"></i></div><span class="v" data-count="${val}"${fmt ? ` data-fmt="${fmt}"` : ''}>0</span>${extra}<span class="kf">${foot}</span></a>`;
+  const sec = (ic, title, sub, right = '') => `<div class="sh"><span class="si"><i data-lucide="${ic}"></i></span><div><h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div><div class="sp"></div>${right}</div>`;
+  const pipeMax = Math.max(1, ...pipe.map(p => p[1]));
+  const leadCount = leads.filter(l => l.status === 'New').length + inq.filter(q => q.status === 'Draft').length;
+  const ready = wos.filter(w => (flowOf(w)[w.stage] || {}).kind === 'ship').length;
   return `<div class="dash">
-  <div class="hello"><div><h2>${hello}, ${esc(me().name.split(' ')[0])}</h2><p class="muted">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}${att.length ? ` · ${att.length} thing${att.length > 1 ? 's' : ''} need${att.length > 1 ? '' : 's'} your attention` : ' · all clear'}</p></div>
-    <div class="row"><button class="btn" onclick="openPalette()"><i data-lucide="search"></i> Search <kbd>Ctrl K</kbd></button>${can('orders') ? '<button class="btn p" onclick="location.hash=\'orders\';setTimeout(orderForm,50)"><i data-lucide="plus"></i> New sales order</button>' : ''}</div></div>
+  <section class="hero">
+    <div class="hero-txt"><span class="eyebrow">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+      <h2>${hello}, ${esc(me().name.split(' ')[0])}</h2>
+      <p>${att.length ? `${att.length} item${att.length > 1 ? 's' : ''} need${att.length > 1 ? '' : 's'} your attention today.` : 'Everything is on track. Nothing is waiting on you.'}</p>
+      <div class="row hero-act"><button class="btn ghost" onclick="openPalette()"><i data-lucide="search"></i> Search <kbd>Ctrl K</kbd></button>${can('orders') ? '<button class="btn light" onclick="location.hash=\'orders\';setTimeout(orderForm,50)"><i data-lucide="plus"></i> New sales order</button>' : ''}</div></div>
+    <div class="hero-stats">
+      <div><span>Awaiting approval</span><b data-count="${toApprove.length}">0</b></div>
+      <div><span>Low stock items</span><b data-count="${low.length}">0</b></div>
+      <div><span>Overdue payments</span><b data-count="${overdue.length}">0</b></div>
+    </div>
+  </section>
   <div class="grid g4 kpis">
-    <a class="card kpi2" href="#orders"><span class="l">Orders this month</span><span class="v" data-count="${monthVal}" data-fmt="inr">0</span>${spark(weeks)}</a>
-    <a class="card kpi2" href="#payments"><span class="l">To collect</span><span class="v" data-count="${toCollect}" data-fmt="inr">0</span><div class="split"><i style="width:${toCollect ? (toCollect - od) / toCollect * 100 : 0}%"></i><i class="od" style="width:${toCollect ? od / toCollect * 100 : 0}%"></i></div><span class="small ${od ? 'warn-t' : 'muted'}">${od ? inrShort(od) + ' overdue' : 'Nothing overdue'}</span></a>
-    <a class="card kpi2" href="#workorders"><span class="l">On the production floor</span><span class="v" data-count="${floor.length}">0</span><span class="small muted">${wos.filter(w => (flowOf(w)[w.stage] || {}).kind === 'ship').length} ready to ship</span></a>
-    <a class="card kpi2" href="#inquiries"><span class="l">Open leads & inquiries</span><span class="v" data-count="${leads.filter(l => l.status === 'New').length + inq.filter(q => q.status === 'Draft').length}">0</span><span class="small muted">${Object.entries(leads.reduce((a, l) => (a[l.source] = (a[l.source] || 0) + 1, a), {})).slice(0, 3).map(([k, v]) => k + ' ' + v).join(' · ') || 'No leads yet'}</span></a>
+    ${kpi('#orders', 'trending-up', 'Orders this month', monthVal, 'inr', 'Weekly order value', spark(weeks))}
+    ${kpi('#payments', 'landmark', 'To collect', toCollect, 'inr', od ? `<span class="warn-t">${inrShort(od)} overdue</span>` : 'Nothing overdue', `<div class="split"><i style="width:${toCollect ? (toCollect - od) / toCollect * 100 : 0}%"></i><i class="od" style="width:${toCollect ? od / toCollect * 100 : 0}%"></i></div>`)}
+    ${kpi('#workorders', 'factory', 'Production floor', floor.length, '', `${ready} ready to ship`)}
+    ${kpi('#inquiries', 'radar', 'Open leads & inquiries', leadCount, '', Object.entries(leads.reduce((a, l) => (a[l.source] = (a[l.source] || 0) + 1, a), {})).slice(0, 3).map(([k, v]) => k + ' ' + v).join(' · ') || 'No leads yet')}
   </div>
-  <div class="card"><div class="row" style="margin-bottom:14px"><h3 style="margin:0;flex:1">Order pipeline</h3><span class="muted small">Click a step to open it</span></div>
-    <div class="pipe">${pipe.map(([l, n, h], i) => `<a href="${h}" class="pipe-step" style="--d:${i * 60}ms"><span class="muted small">${l}</span><b>${n}</b></a>`).join('')}</div></div>
+  <div class="card">${sec('git-branch', 'Order pipeline', 'From first inquiry to dispatch', '<span class="muted small">Select a stage to open it</span>')}
+    <div class="pipe">${pipe.map(([l, n, h], i) => `<a href="${h}" class="pipe-step" style="--d:${i * 60}ms"><span class="pn">${String(i + 1).padStart(2, '0')}</span><span class="pl">${l}</span><b>${n}</b><span class="pb"><i style="width:${n / pipeMax * 100}%"></i></span></a>`).join('')}</div></div>
   <div class="grid g2">
-    <div class="card"><h3>Needs your attention</h3>${att.slice(0, 6).join('') || '<div class="empty"><i data-lucide="check-circle-2"></i><span>All clear. Nothing waiting on you.</span></div>'}${att.length > 6 ? `<p class="muted small">+${att.length - 6} more</p>` : ''}</div>
-    <div class="card"><div class="row"><h3 style="flex:1">Collections</h3><span class="muted small">Last 6 months</span></div>${areaChart(coll, months.map(m => new Date(m + '-01').toLocaleDateString('en-GB', { month: 'short' })))}</div>
-    <div class="card"><div class="row"><h3 style="flex:1">Next dispatches</h3><a class="small" href="#workorders">All work orders</a></div>
-      ${ship.length ? `<div class="tw"><table class="tbl"><tr><th>Order</th><th>Client</th><th>Stage</th><th>Date</th></tr>${ship.map(w => `<tr class="click" onclick="location.hash='workorders/${w.id}'"><td><b>${w.id}</b></td><td>${esc(w.client)}<div class="muted small">${esc(prod(w.productId).name)} · ${w.qty} ${w.unit}</div></td><td><span class="pill">${esc(stageName(w))}</span></td><td>${w.expected}</td></tr>`).join('')}</table></div>` : '<div class="empty"><i data-lucide="truck"></i><span>No work orders in progress</span></div>'}</div>
-    <div class="card"><h3>Team today</h3>${teamBars()}</div>
+    <div class="card">${sec('bell-ring', 'Needs your attention', att.length ? `${att.length} open item${att.length > 1 ? 's' : ''}` : 'All clear')}${att.slice(0, 6).join('') || '<div class="empty"><i data-lucide="check-circle-2"></i><span>All clear. Nothing waiting on you.</span></div>'}${att.length > 6 ? `<p class="muted small">+${att.length - 6} more</p>` : ''}</div>
+    <div class="card">${sec('line-chart', 'Collections', 'Payments received, last 6 months')}${areaChart(coll, months.map(m => new Date(m + '-01').toLocaleDateString('en-GB', { month: 'short' })))}</div>
+    <div class="card">${sec('truck', 'Next dispatches', 'Sorted by expected date', '<a class="lnk" href="#workorders">All work orders <i data-lucide="arrow-right"></i></a>')}
+      ${ship.length ? `<div class="tw"><table class="tbl"><tr><th>Order</th><th>Client</th><th>Stage</th><th>Date</th></tr>${ship.map(w => `<tr class="click" onclick="location.hash='workorders/${w.id}'"><td><b>${w.id}</b></td><td>${esc(w.client)}<div class="muted small">${esc(prod(w.productId).name)} · ${w.qty} ${w.unit}</div></td><td><span class="pill">${esc(stageName(w))}</span></td><td class="num">${w.expected}</td></tr>`).join('')}</table></div>` : '<div class="empty"><i data-lucide="truck"></i><span>No work orders in progress</span></div>'}</div>
+    <div class="card">${sec('users', 'Team today', 'Calls and messages against target')}${teamBars()}</div>
   </div></div>`;
 };
 function teamBars() {

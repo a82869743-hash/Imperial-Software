@@ -356,6 +356,8 @@ function go() {
   $('#np').hidden = true;
   renderNav();
   $('#title').textContent = TITLES[page] || 'Work Order';
+  const grp = (NAV.find(g => g[1].some(x => x[0] === page)) || ['Operations'])[0];
+  $('#crumb').innerHTML = `Imperial<i data-lucide="chevron-right"></i>${grp}${arg ? `<i data-lucide="chevron-right"></i>${esc(TITLES[page] || '')}` : ''}`;
   if (!can(page)) { $('#view').innerHTML = `<div class="alert err"><i data-lucide="lock"></i> Your role (<b>${me().role}</b>) does not have access to this module. Ask the Super Admin to enable it in Admin &amp; Roles.</div>`; return; }
   ($('#view').innerHTML = (PAGES[page] || PAGES.dashboard)(arg));
   save();

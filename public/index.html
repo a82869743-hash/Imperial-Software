@@ -6,21 +6,22 @@
 <title>Imperial ERP</title>
 <link rel="icon" href="logo.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 <div class="app">
   <aside id="side">
-    <div class="brand"><img src="logo.webp" alt=""><div><b>imperial</b><small>Group ERP · CRM</small></div></div>
+    <div class="brand"><span class="mark"><img src="logo.webp" alt=""></span><div><b>Imperial</b><small>Group ERP &amp; CRM</small></div></div>
     <nav id="nav"></nav>
+    <div class="side-foot"><i data-lucide="shield-check"></i><span>Secure workspace<small>Data synced live</small></span></div>
   </aside>
   <div class="main">
     <header>
       <button class="btn sm menu-btn" onclick="document.getElementById('side').classList.toggle('open')"><i data-lucide="menu"></i></button>
-      <h1 id="title">Dashboard</h1>
+      <div class="ttl"><span id="crumb" class="crumb"></span><h1 id="title">Dashboard</h1></div>
       <div class="sp"></div>
       <select id="divSel" aria-label="Company"></select>
       <div class="notif"><button class="btn sm" aria-label="Notifications" onclick="toggleNotif()"><i data-lucide="bell"></i></button><span class="dotn" id="ncount"></span><div id="np" class="np" hidden></div></div>
@@ -31,8 +32,8 @@
 </div>
 <div id="toasts"></div>
 <div id="modal"></div>
-<script src="app.js?v=9"></script>
-<script src="features.js?v=9"></script>
-<script src="business.js?v=9"></script>
+<script src="app.js?v=10"></script>
+<script src="features.js?v=10"></script>
+<script src="business.js?v=10"></script>
 </body>
 </html>
