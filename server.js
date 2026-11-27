@@ -62,7 +62,7 @@ const MODULE_KEYS = {
   workorders: ['workorders', 'orders', 'inventory', 'formulations', 'pos'], inventory: ['inventory', 'pos'],
   procurement: ['vendors', 'pos', 'market', 'inventory'], lab: ['formulations', 'samples', 'inventory'],
   dispatch: ['workorders', 'invoices'], machines: ['machines'], team: ['tasks', 'activity'],
-  attendance: ['attendance', 'leaves', 'holidays'], training: ['modules', 'tests', 'results'], market: ['countries'],
+  attendance: ['attendance', 'leaves', 'holidays'], training: ['modules', 'tests', 'results', 'internPlans'], market: ['countries'],
   admin: ['divisions', 'roles', 'roleView', 'divModules', 'workflows', 'templates', 'settings'],
   settings: ['workflows', 'templates', 'settings']
 };
@@ -262,6 +262,48 @@ app.get('/api/track/:token', (req, res) => {
   res.json({ order: w.order, client: w.client, product: w.productName, qty: w.qty + ' ' + w.unit, stage: w.stage, stages,
     expected: w.expected, note: w.customerNote || '', dispatched: w.stage >= stages.length - 1, photos: w.stage >= stages.length - 1 ? (w.photos || []).filter(p => p.src).map(p => p.src.startsWith('/files/') ? p.src + '?t=' + w.trackToken : p.src) : [] });
 });
+
+/* One-click "call me" / WhatsApp buttons in client mails.
+   Each inquiry mail carries a private link. The visitor confirms name and number; that becomes a new lead for marketing. */
+function inquiryByToken(token) {
+  const r = db.prepare("SELECT value FROM kv WHERE key = 'inquiries'").get();
+  return r && /^[a-f0-9]{32}$/.test(token) ? JSON.parse(r.value).find(q => q.connect && q.connect.token === token) : null;
+}
+const coNames = () => { const r = db.prepare("SELECT value FROM kv WHERE key = 'divisions'").get(); return r ? JSON.parse(r.value) : []; };
+app.get('/api/connect/:token', (req, res) => {
+  const q = inquiryByToken(req.params.token);
+  if (!q) return res.status(404).json({ error: 'This link is no longer valid' });
+  const co = coNames().find(d => d.id === q.connect.div);
+  res.json({ company: co ? co.name : 'Imperial Group', client: q.company, person: q.person || '', email: q.email || '', wa: !!q.connect.wa });
+});
+const connectHits = new Map();
+const clean = (v, n = 120) => String(v || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+app.post('/api/connect/:token', (req, res) => {
+  const ip = req.ip, h = connectHits.get(ip) || { n: 0, t: Date.now() };
+  if (Date.now() - h.t > 3600e3) { h.n = 0; h.t = Date.now(); }
+  if (++h.n > 10) return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  connectHits.set(ip, h);
+  const q = inquiryByToken(req.params.token);
+  if (!q) return res.status(404).json({ error: 'This link is no longer valid' });
+  const b = req.body || {}, action = b.action === 'wa' ? 'wa' : 'call';
+  const name = clean(b.name, 80), phone = clean(b.phone, 25);
+  if (!name || phone.replace(/\D/g, '').length < 7) return res.status(400).json({ error: 'Please enter your name and a phone number' });
+  const save = db.transaction(() => {
+    const no = reserve('L', 1);
+    const leads = JSON.parse((db.prepare("SELECT value FROM kv WHERE key = 'leads'").get() || { value: '[]' }).value);
+    leads.unshift({ id: 'L-' + no, div: q.connect.div || q.div || '', company: q.company, person: name, phone, email: clean(b.email || q.email, 120), country: q.country || '',
+      source: action === 'wa' ? 'Mail button: WhatsApp' : 'Mail button: call back', need: clean(b.note, 300) || ('About ' + q.id), when: clean(b.time, 60), status: 'New', date: new Date().toISOString().slice(0, 10), inquiry: q.id });
+    const put = db.prepare("INSERT INTO kv (key,value,version,updated_at,updated_by) VALUES (?,?,1,?,'public') ON CONFLICT(key) DO UPDATE SET value=excluded.value, version=kv.version+1, updated_at=excluded.updated_at, updated_by='public'");
+    put.run('leads', JSON.stringify(leads), Date.now());
+    const notifs = JSON.parse((db.prepare("SELECT value FROM kv WHERE key = 'notifs'").get() || { value: '[]' }).value);
+    db.prepare("SELECT id FROM users WHERE role IN ('Marketing Head','Super Admin') AND active = 1").all().forEach(u =>
+      notifs.unshift({ to: u.id, text: `${name} (${q.company}) clicked "${action === 'wa' ? 'WhatsApp us' : 'Call me'}" in the ${q.id} mail. Phone ${phone}.`, date: new Date().toISOString().slice(0, 10) }));
+    put.run('notifs', JSON.stringify(notifs.slice(0, 500)), Date.now());
+  });
+  save();
+  res.json({ ok: true, wa: action === 'wa' && q.connect.wa ? 'https://wa.me/' + q.connect.wa : null });
+});
+app.get('/connect/:token', (req, res) => res.sendFile(path.join(__dirname, 'public', 'connect.html')));
 
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/track/:token', (req, res) => res.sendFile(path.join(__dirname, 'public', 'track.html')));

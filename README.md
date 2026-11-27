@@ -62,3 +62,10 @@ Copy `data/imperial.db` (or the Docker volume) daily. That single file is the wh
 - **Live sync:** changes save within a second and other users see them within 15 seconds. If two people edit the same list at once, both edits are kept.
 - **Customer tracking:** each work order has a private link (`/track/…`) showing its stage and expected dispatch date, and dispatch photos once dispatched.
 - **Mail / WhatsApp:** messages are generated and previewed; sending and receiving connect once the accounts are provided.
+
+## Call and WhatsApp buttons in client mails
+
+Every inquiry reply (quotation or introduction) carries a private link with **Request a call back** and **WhatsApp us**.
+The client confirms their name and number on a short page (`/connect/…`); that creates a new lead (source "Mail button")
+and notifies the Marketing Head and main login. With a WhatsApp number set in Settings → WhatsApp & email, the WhatsApp choice
+then opens a chat with that number. The page is rate limited and only accepts name, phone, preferred time and a note.

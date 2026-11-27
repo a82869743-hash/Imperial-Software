@@ -159,8 +159,8 @@ function seed() {
 /* ---------- Server sync ---------- */
 // Shared data is stored per key on the server. Each save sends only the keys that changed;
 // if someone else changed the same key meanwhile, their version is merged item by item with ours.
-const OBJ_KEYS = ['divModules', 'workflows', 'templates', 'settings', 'roleView', 'market'];
-const SHARED = ['divisions', 'roles', 'roleView', 'invoices', 'divModules', 'workflows', 'templates', 'settings', 'products', 'leads', 'inquiries', 'orders', 'payments', 'workorders', 'inventory', 'vendors', 'market', 'pos',
+const OBJ_KEYS = ['divModules', 'workflows', 'templates', 'settings', 'roleView', 'market', 'internPlans'];
+const SHARED = ['internPlans', 'divisions', 'roles', 'roleView', 'invoices', 'divModules', 'workflows', 'templates', 'settings', 'products', 'leads', 'inquiries', 'orders', 'payments', 'workorders', 'inventory', 'vendors', 'market', 'pos',
   'formulations', 'samples', 'machines', 'tasks', 'activity', 'attendance', 'leaves', 'holidays', 'modules', 'tests', 'results', 'countries', 'notifs', 'log'];
 let S, VER = {}, SYNCED = {}, saveTimer = null, flushing = false;
 
@@ -418,11 +418,10 @@ PAGES.leads = () => {
   return `<div class="toolbar">
     <button class="btn p" onclick="leadForm()">+ Add lead</button>
     <button class="btn" onclick="fetchLeads()">⤓ Auto-fetch (IndiaMART / TradeIndia)</button>
-    <button class="btn" onclick="callMe()"><i data-lucide="phone"></i> Simulate “Call me” button click</button>
     <div class="sp"></div><input placeholder="Search…" oninput="filterRows(this,'leadT')">
   </div>
   <div class="tw"><table class="tbl" id="leadT"><tr><th>ID</th><th>Company</th><th>Contact</th><th>Country</th><th>Source</th><th>Need</th><th>Owner</th><th>Status</th><th></th></tr>
-  ${leads.map(l => `<tr><td>${l.id}</td><td><b>${esc(l.company)}</b><div class="muted small">${divName(l.div)}</div></td><td>${esc(l.person)}<div class="muted small">${esc(l.phone)}<br>${esc(l.email)}</div></td><td>${esc(l.country)}</td><td><span class="pill violet">${l.source}</span></td><td>${esc(l.need)}</td><td>${uname(l.owner)}</td>
+  ${leads.map(l => `<tr><td>${l.id}</td><td><b>${esc(l.company)}</b><div class="muted small">${divName(l.div)}</div></td><td>${esc(l.person)}<div class="muted small">${esc(l.phone)}<br>${esc(l.email)}</div></td><td>${esc(l.country)}${countryReq(l.country) ? `<div class="muted small" style="max-width:220px" title="${esc(countryReq(l.country))}">${esc(countryReq(l.country).slice(0, 60))}${countryReq(l.country).length > 60 ? '…' : ''}</div>` : ''}</td><td><span class="pill violet">${l.source}</span></td><td>${esc(l.need)}</td><td>${uname(l.owner)}</td>
   <td><select onchange="setLead('${l.id}',this.value)">${['New', 'Contacted', 'Qualified', 'Lost'].map(s => `<option ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
   <td><button class="btn sm" onclick="leadToInq('${l.id}')">→ Inquiry</button></td></tr>`).join('')}</table></div>`;
 };
@@ -656,9 +655,10 @@ function woDetail(w) {
     const f = S.formulations.find(x => x.batch === w.formula);
     const qKg = convert(w.qty, w.unit, 'kg', p.density);
     body = `<div class="row" style="margin-bottom:12px"><label class="muted small">Formulation / batch</label><select onchange="setW('${w.id}','formula',this.value)"><option value="">Select…</option>${S.formulations.filter(f => f.productId === w.productId).map(f => `<option ${f.batch === w.formula ? 'selected' : ''} value="${f.batch}">${f.batch} · ${f.version}${f.approved ? ' (approved)' : ''}</option>`).join('')}</select><a class="btn sm" href="#lab">Open Lab</a></div>
-    ${f ? `<div class="tw"><table class="tbl"><tr><th>RM code</th><th>Material</th><th>%</th><th>Required</th><th>In stock</th><th>Status</th></tr>
+    ${f ? `<div class="tw"><table class="tbl"><tr><th>RM code</th><th>%</th><th>Required</th><th>In stock</th><th>On order</th><th>Status</th></tr>
     ${f.items.map(it => { const r = rm(it.code); const need = convert(qKg * it.pct / 100, 'kg', r.unit, 1); const ok = r.qty >= need;
-      return `<tr><td>${it.code}</td><td>${r.name}</td><td>${it.pct}%</td><td>${need.toFixed(0)} ${r.unit}</td><td>${r.qty} ${r.unit}</td><td>${ok ? (r.qty - need < r.min ? '<span class="pill amber">OK, will go below min</span>' : '<span class="pill green">Available</span>') : `<span class="pill red">Short ${(need - r.qty).toFixed(0)}</span> <button class="btn sm" onclick="quickPO('${it.code}',${Math.ceil(need - r.qty + r.min)})">Order</button>`}</td></tr>`; }).join('')}</table></div>` : '<div class="alert warn">No formulation linked.</div>'}`;
+      const onOrd = S.pos.filter(x => x.code === it.code && ['Ordered', 'Awaiting approval'].includes(x.status)).reduce((a, x) => a + x.qty, 0), toBuy = Math.max(0, Math.ceil(need - r.qty - onOrd));
+      return `<tr><td><b>${it.code}</b></td><td>${it.pct}%</td><td class="num">${need.toFixed(0)} ${r.unit}</td><td class="num">${r.qty} ${r.unit}</td><td class="num">${onOrd ? onOrd + ' ' + r.unit : '–'}</td><td>${ok ? (r.qty - need < r.min ? '<span class="pill amber">OK, will go below min</span>' : '<span class="pill green">Available</span>') : (toBuy ? `<span class="pill red">Buy ${toBuy} ${r.unit}</span> <button class="btn sm" onclick="quickPO('${it.code}',${Math.ceil(toBuy + r.min)})">Raise PO</button>` : '<span class="pill amber">Short, covered by open PO</span>')}</td></tr>`; }).join('')}</table></div>` : '<div class="alert warn">No formulation linked.</div>'}`;
   }
   if (woTab === 'stages') body = stagesBar(w) + flowOf(w).map((st, i) => `<div class="card stage-card ${i === w.stage ? 'is-cur' : i > w.stage ? 'is-next' : ''}"><h3>${i + 1}. ${esc(st.name)}<span class="sp"></span>${i < w.stage ? '<span class="pill green">Done</span>' : ''}</h3>
       ${st.info ? `<p class="muted small" style="margin:-6px 0 8px">${esc(st.info)}</p>` : ''}
@@ -816,19 +816,19 @@ PAGES.lab = () => {
   const hits = labQ ? S.formulations.filter(f => (f.batch + f.client + prod(f.productId).name + prod(f.productId).alias).toLowerCase().includes(labQ.toLowerCase())) : S.formulations.filter(inDiv);
   return `<div class="grid g2"><div class="card"><h3>Samples (inward → testing → formulation)<span class="sp"></span><button class="btn sm" onclick="sampleForm()">+ Sample</button></h3>
     ${S.samples.filter(inDiv).map(s => `<div style="margin-bottom:12px"><b>${s.id}</b> · ${esc(s.client)} · ${s.type}<div class="muted small">Received ${s.received} · ${esc(s.tests)}</div>
-    <div class="stages">${['Inward (QA)', 'Testing', 'Trial formulations', 'Sent to client', 'Approved'].map((x, i) => `<div class="stage ${i < s.stage ? 'done' : i === s.stage ? 'cur' : ''}"><span class="dot">${i < s.stage ? '<i data-lucide="check"></i>' : ''}</span>${x}</div>`).join('')}</div>
-    <button class="btn sm" onclick="S.samples.find(x=>x.id==='${s.id}').stage=Math.min(5,S.samples.find(x=>x.id==='${s.id}').stage+1);rerender()">Advance</button></div>`).join('')}</div>
+    <div class="stages">${['Inward (QA)', 'Testing', 'Trial formulations', 'Sent to client', 'Approved'].map((x, i) => `<div class="stage ${i < s.stage ? 'done' : i === s.stage ? 'cur' : ''}"><span class="dot">${i < s.stage ? '<i data-lucide="check"></i>' : ''}</span>${x}${(s.log || [])[i] ? `<div class="muted" style="font-size:10.5px;font-weight:500">${s.log[i].at}</div>` : ''}</div>`).join('')}</div>
+    ${sampleExtras(s)}</div>`).join('') || '<div class="empty"><i data-lucide="test-tubes"></i><span>No samples yet</span></div>'}</div>
   <div class="card"><h3>Traceability search</h3><input style="width:100%" placeholder="Batch no, client, product or export name…" value="${esc(labQ)}" onchange="labQ=this.value;rerender()">
     <div class="alert info" style="margin-top:10px">Example: a client approved <b>combination 2 of 4</b> a year ago and now sends a PO for it. Search “Gulf” to find the exact raw-material lots and percentages.</div></div></div>
   <div class="card" style="margin-top:16px"><h3>Formulations (input raw-material codes → output batch / serial)<span class="sp"></span><button class="btn sm p" onclick="formForm()">+ New formulation</button></h3>
   ${hits.map(f => `<div class="card" style="margin-bottom:10px;box-shadow:none"><div class="row"><b>${f.batch}</b><span class="muted">${prod(f.productId).name}${prod(f.productId).alias ? ' / export: ' + prod(f.productId).alias : ''}</span><span class="pill">${f.version}</span>${f.approved ? '<span class="pill green">Client approved</span>' : '<span class="pill grey">Trial</span>'}<span class="sp" style="flex:1"></span><span class="muted small">${esc(f.client)} · ${f.date}</span></div>
-    <div class="tw" style="margin-top:8px"><table class="tbl"><tr><th>RM code</th><th>Material</th><th>%</th><th>Lot / serial used</th></tr>${f.items.map(i => `<tr><td>${i.code}</td><td>${rm(i.code).name}</td><td>${i.pct}%</td><td>${i.lot}</td></tr>`).join('')}</table></div>
+    <div class="tw" style="margin-top:8px"><table class="tbl"><tr><th>RM code</th><th>%</th><th>Lot / serial used</th></tr>${f.items.map(i => `<tr><td><b>${i.code}</b></td><td>${i.pct}%</td><td>${i.lot}</td></tr>`).join('')}</table></div>
     ${f.notes ? `<div class="muted small" style="margin-top:6px"><i data-lucide="file-text"></i> ${esc(f.notes)}</div>` : ''}
     <div class="small" style="margin-top:6px">Used in: ${S.workorders.filter(w => w.formula === f.batch).map(w => `<a href="#workorders/${w.id}">${w.id}</a>`).join(', ') || '—'}</div></div>`).join('') || '<span class="muted">No match</span>'}</div>`;
 };
 function sampleForm() {
-  modal('New sample', `<div class="form"><label>Client<input id="sc"></label><label>Type<input id="st" value="Crude oil sample (inward)"></label><label class="full">Initial test results<input id="sr"></label></div>`,
-    `<button class="btn p" onclick="(()=>{S.samples.unshift({id:nextNo('SMP'),div:'CHEM',client:val('sc'),type:val('st'),received:today(),stage:0,tests:val('sr'),batches:[]});closeModal();rerender()})()">Save</button>`);
+  modal('New sample', `<div class="form"><label>Client<input id="sc"></label><label>Type<input id="st" value="Crude oil sample (inward)"></label><label>Company<select id="sd">${divOpts(S.division === 'all' ? 'CHEM' : S.division)}</select></label><label class="full">Initial test results<input id="sr"></label></div>`,
+    `<button class="btn p" onclick="(()=>{S.samples.unshift({id:nextNo('SMP'),div:val('sd'),client:val('sc'),type:val('st'),received:today(),stage:0,tests:val('sr'),batches:[],media:[],log:[]});closeModal();rerender()})()">Save</button>`);
 }
 function formForm() {
   const rows = [0, 1, 2, 3].map(i => `<div class="row" style="margin-bottom:6px"><select id="fc${i}"><option value="">—</option>${S.inventory.map(x => `<option value="${x.code}">${x.code} · ${x.name}</option>`)}</select><input id="fp${i}" type="number" placeholder="%" style="width:80px"></div>`).join('');

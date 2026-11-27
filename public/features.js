@@ -375,6 +375,7 @@ function internRow(u) {
     <span class="pill ${avg == null ? 'grey' : avg >= 70 ? 'green' : 'amber'}">Tests ${avg == null ? '—' : avg + '%'}</span><span class="pill ${rate >= .7 ? 'green' : rate >= .4 ? 'amber' : 'red'}">Follow-ups ${Math.round(rate * 100)}%</span>
     ${isHR() || me().role === 'Marketing Head' ? `<button class="btn sm" onclick="feedbackForm('${u.id}')">Feedback</button>` : ''}</div>
     <div class="stages">${steps.map(([s, at], i) => `<div class="stage ${d > at ? 'done' : d > (i ? steps[i - 1][1] : 0) ? 'cur' : ''}"><span class="dot">${d > at ? '<i data-lucide="check"></i>' : ''}</span>${s}</div>`).join('')}</div>
+    ${internTests(u)}
     ${fb ? `<div class="small"><b>Feedback:</b> ${esc(fb)}</div>` : ''}</div>`;
 }
 function feedbackForm(uid_) {
