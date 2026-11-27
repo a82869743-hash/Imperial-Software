@@ -346,3 +346,36 @@ Open http://localhost:3000.
 8. Wrote the WhatsApp question list for the client; the owner answered part of it (section 3).
 9. Built everything from those answers: GST invoices, per-order advances, payment defaults, channels per company and role, view/edit permissions, geofenced attendance, staff targets.
 10. Tested end to end on a fresh database. Fixed a number-clash bug and a first-number-after-login bug.
+
+
+---
+
+## 9. Update: work done in the Claude Code session (Nov 2026)
+
+Branch: `claude/modest-rubin-pzxg8x`. Run locally: `npm install && ADMIN_PASSWORD=... npm start`. Deploy: see DEPLOY.md.
+
+**Logins (decided with the owner)**
+- One main login (Super Admin): every company, every approval. Who holds it is not decided yet.
+- One **shared** login per company (Company Login role, locked to one company): CHEM, AGRO, SPC, PACK (Flexipack = Bhavin Sir).
+- Nirav Sir (Production Head) covers CHEM + AGRO + SPC. Marketing (Jagruti Mam), Accounts and HR are group-wide.
+- Company lock is enforced on the server (`users.divs`, `scopeValue` / `mergeScoped` in server.js). Set in Admin → Users → Company access.
+
+**Files added**
+- `public/roles.js`: per-role dashboards, Approvals page (`approvalsFor`), PO approval step (`poStatus`), company switch lock.
+- `public/ui.js`: page header on every page (`PAGE_INFO`), markup polish, new sign-in screen.
+- `public/connect.js` + `public/connect.html`: call / WhatsApp buttons in inquiry mails → `/connect/<token>` → new lead + notification. Also country requirements, sample timeline/media/batch numbers, intern test plans (`internPlans` key) with reminders.
+- `deploy/` (Caddyfile, systemd unit, off-site backup script), `.env.example`, `DEPLOY.md`.
+
+**Design**: Manrope, blue/white, Lucide icons. Styles are layered at the end of `styles.css` (v2 refresh, v3 page shell). Owner asked to keep tick boxes, stage checklists and graphs as they are.
+
+**Server additions**: trust proxy, CSP + security headers, `/healthz`, daily DB backups (`DATA_DIR/backups`, `BACKUP_KEEP`), graceful shutdown, `/api/connect`.
+
+**Phase status**
+- Phase 1 (gaps): done.
+- Phase 2 (go live): deploy setup ready and tested with Docker + Caddy on localhost. Needs a server + domain, real client data, phone testing.
+- Phase 3 (WhatsApp Business API, Google Workspace mail, Flexipack PO intake, IndiaMART/TradeIndia): waiting on accounts.
+- Phase 4 (e-invoice/e-way bill, mobile app): later.
+
+**Demo logins** (password `imperial-demo`): chem@, agro@, spc@, flexipack@, nirav@, jagruti@, mahesh@ (Accounts), vikram@ (Store), kunal@ (Lab), hetal@ (HR), priya@ (intern), all `@imperial.demo`.
+
+**Remember**: bump `?v=N` in `public/index.html` after changing JS/CSS.
