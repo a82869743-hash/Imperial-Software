@@ -1,13 +1,33 @@
+# Production: the app behind Caddy, which gets and renews the HTTPS certificate for DOMAIN automatically.
+# 1. cp .env.example .env and fill it in   2. docker compose up -d --build
 services:
   erp:
     build: .
-    ports:
-      - "3000:3000"
+    restart: unless-stopped
+    env_file: .env
     environment:
-      ADMIN_EMAIL: admin@imperial.local
-      ADMIN_PASSWORD: change-me-now
+      DATA_DIR: /data
     volumes:
       - erp-data:/data
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2.8
     restart: unless-stopped
+    depends_on:
+      - erp
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
 volumes:
   erp-data:
+  caddy-data:
+  caddy-config:

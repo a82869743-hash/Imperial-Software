@@ -110,8 +110,22 @@ const adminOnly = (req, res, next) => req.user.role === 'Super Admin' ? next() :
 
 /* ---------- App ---------- */
 const app = express();
+// Behind a reverse proxy (Caddy / Nginx) trust its X-Forwarded-* headers so client IPs and HTTPS are seen correctly.
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback, linklocal, uniquelocal');
+app.disable('x-powered-by');
 app.use(express.json({ limit: '15mb' }));
-app.use((req, res, next) => { res.set('X-Content-Type-Options', 'nosniff'); res.set('Referrer-Policy', 'same-origin'); next(); });
+const CSP = ["default-src 'self'", "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "font-src 'self' https://fonts.gstatic.com", "img-src 'self' data: blob:",
+  "media-src 'self' blob:", "connect-src 'self'", "frame-src https://www.youtube-nocookie.com", "frame-ancestors 'self'", "base-uri 'self'", "form-action 'self'"].join('; ');
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff'); res.set('Referrer-Policy', 'same-origin'); res.set('X-Frame-Options', 'SAMEORIGIN');
+  res.set('Content-Security-Policy', CSP);
+  res.set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self)');
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000');
+  next();
+});
+// Health check for Docker / load balancers.
+app.get('/healthz', (req, res) => { try { db.prepare('SELECT 1').get(); res.json({ ok: true }); } catch (e) { res.status(500).json({ ok: false }); } });
 
 const attempts = new Map();
 app.post('/api/login', (req, res) => {
@@ -305,9 +319,26 @@ app.post('/api/connect/:token', (req, res) => {
 });
 app.get('/connect/:token', (req, res) => res.sendFile(path.join(__dirname, 'public', 'connect.html')));
 
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+// Scripts and styles are versioned (?v=N) so they can be cached; HTML is always revalidated.
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], setHeaders: (res, file) => res.set('Cache-Control', /\.html$/.test(file) ? 'no-cache' : 'public, max-age=604800') }));
 app.get('/track/:token', (req, res) => res.sendFile(path.join(__dirname, 'public', 'track.html')));
 
 // Clean expired sessions daily
 setInterval(() => db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now()), 864e5).unref();
-app.listen(PORT, () => console.log(`Imperial ERP running on http://localhost:${PORT}`));
+
+/* Daily database backup into DATA_DIR/backups (keeps BACKUP_KEEP days, default 14). Uploaded files live in DATA_DIR/uploads. */
+const BACKUPS = path.join(DATA_DIR, 'backups'), KEEP = +process.env.BACKUP_KEEP || 14;
+async function backupNow() {
+  try {
+    fs.mkdirSync(BACKUPS, { recursive: true });
+    const file = path.join(BACKUPS, `imperial-${new Date().toISOString().slice(0, 10)}.db`);
+    if (!fs.existsSync(file)) { await db.backup(file); console.log('Backup written:', file); }
+    fs.readdirSync(BACKUPS).filter(f => /^imperial-\d{4}-\d{2}-\d{2}\.db$/.test(f)).sort().slice(0, -KEEP).forEach(f => fs.unlinkSync(path.join(BACKUPS, f)));
+  } catch (e) { console.error('Backup failed:', e.message); }
+}
+if (process.env.BACKUPS !== 'off') { setTimeout(backupNow, 60e3).unref(); setInterval(backupNow, 6 * 3600e3).unref(); }
+
+const server = app.listen(PORT, () => console.log(`Imperial ERP running on http://localhost:${PORT}`));
+// Clean shutdown so the database is closed properly on restarts and deploys.
+function shutdown(sig) { console.log(sig, 'received, shutting down'); server.close(() => { db.close(); process.exit(0); }); setTimeout(() => process.exit(0), 8000).unref(); }
+process.on('SIGTERM', () => shutdown('SIGTERM')); process.on('SIGINT', () => shutdown('SIGINT'));

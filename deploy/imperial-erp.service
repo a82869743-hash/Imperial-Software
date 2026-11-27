@@ -1,0 +1,19 @@
+# Run without Docker on a Linux server (Ubuntu/Debian) with Node 20+.
+# Install: copy the app to /opt/imperial-erp, run `npm ci --omit=dev` there, create /opt/imperial-erp/.env,
+# then: sudo cp deploy/imperial-erp.service /etc/systemd/system/ && sudo systemctl enable --now imperial-erp
+[Unit]
+Description=Imperial ERP
+After=network.target
+
+[Service]
+Type=simple
+User=imperial
+WorkingDirectory=/opt/imperial-erp
+EnvironmentFile=/opt/imperial-erp/.env
+Environment=NODE_ENV=production PORT=3000 DATA_DIR=/var/lib/imperial-erp
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

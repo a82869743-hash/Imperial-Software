@@ -33,14 +33,16 @@ The server enforces the lock: a company login never receives another company's r
 
 Demo company logins: `chem@`, `agro@`, `spc@`, `flexipack@imperial.demo` (password `imperial-demo`).
 
-## Run with Docker (any server or cloud)
+## Run on a server (production)
+
+See **[DEPLOY.md](DEPLOY.md)**: copy `.env.example` to `.env`, set your domain and admin password, then
 
 ```bash
 docker compose up -d --build
 ```
 
-Edit `ADMIN_PASSWORD` in `docker-compose.yml` first. Data is kept in the `erp-data` volume.
-For use over the internet, put it behind HTTPS (e.g. Caddy or Nginx); sessions automatically use secure cookies there.
+Caddy serves the app over HTTPS on your domain with an automatic certificate. Data, uploads and daily backups
+are kept in the `erp-data` volume.
 
 ## Settings (environment variables)
 
@@ -50,10 +52,14 @@ For use over the internet, put it behind HTTPS (e.g. Caddy or Nginx); sessions a
 | `DATA_DIR` | `./data` | Where the database file lives |
 | `ADMIN_EMAIL` / `ADMIN_PHONE` / `ADMIN_PASSWORD` | — | First Super Admin (only used on the very first start) |
 | `DEMO_PASSWORD` | `imperial-demo` | Password for demo staff |
+| `DOMAIN` | — | Domain Caddy serves over HTTPS (Docker setup) |
+| `BACKUP_KEEP` | 14 | Days of daily database backups to keep |
+| `BACKUPS` | on | Set to `off` to stop automatic backups |
+| `TRUST_PROXY` | private networks | Which proxies' forwarded headers to trust |
 
 ## Backups
 
-Copy `data/imperial.db` (or the Docker volume) daily. That single file is the whole database.
+A copy of the database is written every day to `backups/` in the data folder (14 days kept). Copy the backups and the `uploads/` folder off the server nightly; see DEPLOY.md.
 
 ## How it works
 
