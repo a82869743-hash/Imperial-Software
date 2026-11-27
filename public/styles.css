@@ -507,3 +507,9 @@ a.card:hover,button.card:hover{border-color:var(--blue-200);box-shadow:var(--sh-
 }
 .menu-btn{display:none!important}@media (max-width:820px){.menu-btn{display:inline-flex!important}}
 .tbl td:first-child,.tbl th,.tbl td .pill,.tbl td .btn{white-space:nowrap}.tbl td{padding:14px 14px}.tbl td .muted.small{font-size:12px}.pill{white-space:nowrap}
+/* Flow strip: the steps this login works through */
+.flowstrip{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-6px 0 0;font-size:12px;font-weight:650;color:var(--ink-2)}
+.flowstrip span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+.flowstrip svg.lucide{width:13px;height:13px;color:var(--faint);vertical-align:0}
+.pipe-step .pl svg.lucide{width:14px;height:14px;color:var(--blue)}
+#divSel[hidden]{display:none}

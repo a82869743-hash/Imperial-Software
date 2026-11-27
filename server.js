@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT);
 `);
+// Company lock: comma list of company codes the login may see (empty = whole group).
+if (!db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'divs'").get()) db.exec("ALTER TABLE users ADD COLUMN divs TEXT DEFAULT ''");
 
 /* ---------- Passwords & sessions ---------- */
 function hashPass(pw) { const salt = crypto.randomBytes(16).toString('hex'); return salt + ':' + crypto.scryptSync(pw, salt, 64).toString('hex'); }
@@ -82,8 +84,28 @@ function canWrite(user, key) {
   if (pages.includes('*') || COMMON.includes(key)) return true;
   return pages.some(p => (MODULE_KEYS[p] || []).includes(key));
 }
+/* ---------- Company lock ----------
+   Records in these lists carry a company code (div). A login locked to some companies only receives their records,
+   and a save from it keeps the other companies' records untouched on the server. Records with no company stay shared. */
+const DIV_KEYS = ['leads', 'inquiries', 'products', 'orders', 'payments', 'workorders', 'inventory', 'formulations', 'samples', 'pos', 'invoices', 'machines'];
+const userDivs = u => String(u.divs || '').split(',').map(x => x.trim()).filter(Boolean);
+function scopeValue(user, key, value) {
+  const divs = userDivs(user);
+  if (!divs.length || !Array.isArray(value)) return value;
+  if (key === 'divisions') return value.filter(d => divs.includes(d.id));
+  if (!DIV_KEYS.includes(key)) return value;
+  return value.filter(r => !r || !r.div || divs.includes(r.div));
+}
+// Full list to store after a locked login saves its part.
+function mergeScoped(user, key, incoming, current) {
+  const divs = userDivs(user);
+  if (!divs.length || !DIV_KEYS.includes(key) || !Array.isArray(incoming)) return { value: incoming };
+  if (incoming.some(r => r && r.div && !divs.includes(r.div))) return { error: 'You can only save records for your own company' };
+  const hidden = (Array.isArray(current) ? current : []).filter(r => r && r.div && !divs.includes(r.div));
+  return { value: [...incoming, ...hidden] };
+}
 const seesSalary = u => ['Super Admin', 'HR', 'Accounts'].includes(u.role);
-const publicUser = (u, viewer) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, intern: !!u.intern, joined: u.joined, active: !!u.active, ...(seesSalary(viewer) || viewer.id === u.id ? { salary: u.salary } : {}) });
+const publicUser = (u, viewer) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, divs: userDivs(u), intern: !!u.intern, joined: u.joined, active: !!u.active, ...(seesSalary(viewer) || viewer.id === u.id ? { salary: u.salary } : {}) });
 const adminOnly = (req, res, next) => req.user.role === 'Super Admin' ? next() : res.status(403).json({ error: 'Super Admin only' });
 
 /* ---------- App ---------- */
@@ -116,13 +138,13 @@ app.post('/api/password', auth, (req, res) => {
 // Everything the app needs on load: me, users, all shared data with versions.
 app.get('/api/state', auth, (req, res) => {
   const data = {}, versions = {};
-  db.prepare('SELECT key, value, version FROM kv').all().forEach(r => { if (KEYS.includes(r.key)) { data[r.key] = JSON.parse(r.value); versions[r.key] = r.version; } });
+  db.prepare('SELECT key, value, version FROM kv').all().forEach(r => { if (KEYS.includes(r.key)) { data[r.key] = scopeValue(req.user, r.key, JSON.parse(r.value)); versions[r.key] = r.version; } });
   res.json({ me: publicUser(req.user, req.user), users: db.prepare('SELECT * FROM users ORDER BY name').all().map(u => publicUser(u, req.user)), data, versions, empty: !Object.keys(data).length });
 });
 // Light poll: only keys changed since the client's versions.
 app.post('/api/changes', auth, (req, res) => {
   const have = req.body.versions || {}, out = {}, versions = {};
-  db.prepare('SELECT key, value, version FROM kv').all().forEach(r => { if (KEYS.includes(r.key) && r.version !== have[r.key]) { out[r.key] = JSON.parse(r.value); versions[r.key] = r.version; } });
+  db.prepare('SELECT key, value, version FROM kv').all().forEach(r => { if (KEYS.includes(r.key) && r.version !== have[r.key]) { out[r.key] = scopeValue(req.user, r.key, JSON.parse(r.value)); versions[r.key] = r.version; } });
   res.json({ data: out, versions });
 });
 // Save one shared key. `base` is the version the client edited; a newer server version returns 409 with the latest.
@@ -131,10 +153,12 @@ app.put('/api/data/:key', auth, (req, res) => {
   if (!KEYS.includes(key)) return res.status(404).json({ error: 'Unknown data' });
   if (!canWrite(req.user, key)) return res.status(403).json({ error: 'Your role cannot change ' + key });
   const cur = db.prepare('SELECT version, value FROM kv WHERE key = ?').get(key);
-  if (cur && req.body.base !== undefined && req.body.base !== cur.version) return res.status(409).json({ value: JSON.parse(cur.value), version: cur.version });
+  if (cur && req.body.base !== undefined && req.body.base !== cur.version) return res.status(409).json({ value: scopeValue(req.user, key, JSON.parse(cur.value)), version: cur.version });
+  const m = mergeScoped(req.user, key, req.body.value, cur && JSON.parse(cur.value));
+  if (m.error) return res.status(403).json({ error: m.error });
   const version = (cur ? cur.version : 0) + 1;
   db.prepare('INSERT INTO kv (key,value,version,updated_at,updated_by) VALUES (?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, version=excluded.version, updated_at=excluded.updated_at, updated_by=excluded.updated_by')
-    .run(key, JSON.stringify(req.body.value), version, Date.now(), req.user.id);
+    .run(key, JSON.stringify(m.value), version, Date.now(), req.user.id);
   res.json({ version });
 });
 
@@ -191,7 +215,8 @@ app.post('/api/users', auth, adminOnly, (req, res) => {
   if (!b.name || !b.role || (!email && !phone)) return res.status(400).json({ error: 'Name, role and email or mobile are required' });
   if (String(b.password || '').length < 8) return res.status(400).json({ error: 'Password needs at least 8 characters' });
   const id = 'U' + crypto.randomBytes(4).toString('hex');
-  try { db.prepare('INSERT INTO users (id,name,email,phone,role,pass,salary,intern,joined) VALUES (?,?,?,?,?,?,?,?,?)').run(id, b.name, email, phone, b.role, hashPass(b.password), +b.salary || 0, b.intern ? 1 : 0, b.joined || new Date().toISOString().slice(0, 10)); }
+  const divs = Array.isArray(b.divs) ? b.divs.join(',') : String(b.divs || '');
+  try { db.prepare('INSERT INTO users (id,name,email,phone,role,pass,salary,intern,joined,divs) VALUES (?,?,?,?,?,?,?,?,?,?)').run(id, b.name, email, phone, b.role, hashPass(b.password), +b.salary || 0, b.intern ? 1 : 0, b.joined || new Date().toISOString().slice(0, 10), divs); }
   catch (e) { return res.status(400).json({ error: 'That email or mobile is already used' }); }
   res.json({ id });
 });
@@ -204,6 +229,10 @@ app.patch('/api/users/:id', auth, adminOnly, (req, res) => {
       b.name ?? u.name, b.email !== undefined ? normEmail(b.email) : u.email, b.phone !== undefined ? normPhone(b.phone) : u.phone,
       b.role ?? u.role, b.salary ?? u.salary, b.intern !== undefined ? (b.intern ? 1 : 0) : u.intern, b.active !== undefined ? (b.active ? 1 : 0) : u.active, u.id);
   } catch (e) { return res.status(400).json({ error: 'That email or mobile is already used' }); }
+  if (b.divs !== undefined) {
+    if (u.id === req.user.id && (Array.isArray(b.divs) ? b.divs.length : b.divs)) return res.status(400).json({ error: 'The main login must keep access to every company' });
+    db.prepare('UPDATE users SET divs = ? WHERE id = ?').run(Array.isArray(b.divs) ? b.divs.join(',') : String(b.divs || ''), u.id);
+  }
   if (b.password) {
     if (String(b.password).length < 8) return res.status(400).json({ error: 'Password needs at least 8 characters' });
     db.prepare('UPDATE users SET pass = ? WHERE id = ?').run(hashPass(b.password), u.id);
@@ -218,9 +247,9 @@ const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'imperial-demo';
 app.post('/api/demo-users', auth, adminOnly, (req, res) => {
   const orders = db.prepare("SELECT value FROM kv WHERE key = 'orders'").get();
   if ((orders && JSON.parse(orders.value).length) || db.prepare('SELECT COUNT(*) n FROM users').get().n > 1) return res.status(400).json({ error: 'Demo data can only be loaded into an empty system' });
-  const ins = db.prepare('INSERT OR IGNORE INTO users (id,name,email,role,pass,salary,intern,joined) VALUES (?,?,?,?,?,?,?,?)');
+  const ins = db.prepare('INSERT OR IGNORE INTO users (id,name,email,role,pass,salary,intern,joined,divs) VALUES (?,?,?,?,?,?,?,?,?)');
   const hash = hashPass(DEMO_PASSWORD);
-  (req.body.users || []).forEach(u => ins.run(u.id, u.name, u.name.split(' ')[0].toLowerCase() + '@imperial.demo', u.role, hash, +u.salary || 0, u.intern ? 1 : 0, u.joined || null));
+  (req.body.users || []).forEach(u => ins.run(u.id, u.name, u.name.split(' ')[0].toLowerCase() + '@imperial.demo', u.role, hash, +u.salary || 0, u.intern ? 1 : 0, u.joined || null, (u.divs || []).join(',')));
   res.json({ ok: true, password: DEMO_PASSWORD });
 });
 

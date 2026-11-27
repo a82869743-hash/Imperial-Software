@@ -309,12 +309,13 @@ function receivePO(id) { const po = S.pos.find(p => p.id === id); po.status = 'R
 const _pagesProcurement = PAGES.procurement;
 PAGES.procurement = () => {
   const rows = S.vendors.map(v => ({ v, s: vendorScore(v) })).sort((a, b) => b.s.score - a.s.score);
-  const open = S.pos.filter(p => p.status === 'Ordered');
+  const open = S.pos.filter(p => inDiv(p) && p.status === 'Ordered');
   return `<div class="grid g2" style="margin-bottom:16px"><div class="card"><h3>Vendor scorecard</h3><div class="tw"><table class="tbl"><tr><th>Vendor</th><th>Score</th><th>On time</th><th>Price vs market</th><th>Orders</th></tr>
     ${rows.map(({ v, s }, n) => `<tr><td><b>${esc(v.name)}</b>${n === 0 ? ' <span class="pill green">Best</span>' : ''}${v.approved ? '' : ' <span class="pill amber">Unapproved</span>'}</td><td><div class="score"><div class="bar"><i style="width:${s.score}%"></i></div><b>${s.score}</b></div></td>
     <td>${s.onTime == null ? '<span class="muted">No data</span>' : s.onTime + '%'}</td><td>${s.price == null ? '—' : `<span style="color:${s.price > 0 ? 'var(--red)' : 'var(--green)'}">${s.price > 0 ? '+' : ''}${s.price.toFixed(1)}%</span>`}</td><td>${s.orders}</td></tr>`).join('')}</table></div>
     <p class="muted small">Score = half on-time delivery, half price against the market rate you enter. On-time is measured from each PO's promised date to when it is received.</p></div>
-    <div class="card"><h3>Open purchase orders</h3>${open.map(p => attnBtn('shopping-cart', p.promised && p.promised < today() ? 'red' : 'blue', `${p.id} · ${rm(p.code).name}`, `${S.vendors.find(v => v.id === p.vendor)?.name} · ${p.qty} ${p.unit} · ${p.promised ? 'promised ' + p.promised : 'no date'}${p.promised && p.promised < today() ? ' · LATE' : ''}`, `receivePO('${p.id}')`, 'Received')).join('') || '<span class="muted">No open POs</span>'}</div></div>` + _pagesProcurement();
+    <div class="card"><h3>Open purchase orders</h3>${open.map(p => attnBtn('shopping-cart', p.promised && p.promised < today() ? 'red' : 'blue', `${p.id} · ${rm(p.code).name}`, `${S.vendors.find(v => v.id === p.vendor)?.name} · ${p.qty} ${p.unit} · ${p.promised ? 'promised ' + p.promised : 'no date'}${p.promised && p.promised < today() ? ' · LATE' : ''}`, `receivePO('${p.id}')`, 'Received')).join('') || '<span class="muted">No open POs</span>'}
+    ${S.pos.filter(p => inDiv(p) && p.status === 'Awaiting approval').map(p => attn('hourglass', 'amber', `${p.id} · ${rm(p.code).name}`, `Waiting for approval · ${p.qty} ${p.unit} @ ₹${p.rate}${p.by ? ' · raised by ' + esc(p.by) : ''}`, '#approvals', 'View')).join('')}</div></div>` + _pagesProcurement();
 };
 
 /* ---------- Machines: reminders with expected vs last cost ---------- */
@@ -330,7 +331,7 @@ PAGES.machines = () => {
 function machineForm() {
   modal('Add machine', `<div class="form"><label class="full">Machine name<input id="mn"></label><label>Last serviced<input id="ml" type="date" value="${today()}"></label><label>Service every (days)<input id="me" type="number" value="60"></label>
     <label>Average service cost ₹<input id="mc2" type="number" value="10000"></label><label>Average downtime (hours)<input id="mh2" type="number" value="4"></label><label>Remind me (days before)<input id="mr" type="number" value="7"></label></div>`,
-    `<button class="btn p" onclick="S.machines.push({id:uid('M'),name:val('mn'),last:val('ml'),every:+val('me'),avgCost:+val('mc2'),avgHrs:+val('mh2'),remind:+val('mr'),log:[]});closeModal();rerender()">Save</button>`);
+    `<button class="btn p" onclick="S.machines.push({id:uid('M'),div:S.division!=='all'?S.division:'',name:val('mn'),last:val('ml'),every:+val('me'),avgCost:+val('mc2'),avgHrs:+val('mh2'),remind:+val('mr'),log:[]});closeModal();rerender()">Save</button>`);
 }
 function machineReminders() {
   const sent = (S.settings || {}).mreminded || {};

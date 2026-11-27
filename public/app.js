@@ -22,22 +22,29 @@ function seed() {
     ],
     roles: {
       'Super Admin': ['*'],
-      'Production Head': ['dashboard', 'workorders', 'inventory', 'procurement', 'lab', 'dispatch', 'machines', 'products', 'team', 'attendance'],
-      'Marketing Head': ['dashboard', 'leads', 'inquiries', 'products', 'orders', 'payments', 'team', 'training', 'market', 'attendance'],
-      'Accounts': ['dashboard', 'orders', 'payments', 'invoices', 'dispatch', 'procurement', 'attendance'],
-      'HR': ['dashboard', 'attendance', 'training', 'team'],
-      'Sales Executive': ['dashboard', 'leads', 'inquiries', 'team', 'training', 'attendance'],
-      'Lab / R&D': ['dashboard', 'lab', 'inventory', 'attendance']
+      'Production Head': ['dashboard', 'approvals', 'workorders', 'inventory', 'procurement', 'lab', 'dispatch', 'machines', 'products', 'team', 'attendance'],
+      'Marketing Head': ['dashboard', 'approvals', 'leads', 'inquiries', 'products', 'orders', 'payments', 'team', 'training', 'market', 'attendance'],
+      'Accounts': ['dashboard', 'approvals', 'orders', 'payments', 'invoices', 'dispatch', 'procurement', 'attendance'],
+      'HR': ['dashboard', 'approvals', 'attendance', 'training', 'team'],
+      'Sales Executive': ['dashboard', 'approvals', 'leads', 'inquiries', 'team', 'training', 'attendance'],
+      'Lab / R&D': ['dashboard', 'approvals', 'lab', 'inventory', 'attendance'],
+      'Company Login': ['dashboard', 'approvals', 'inquiries', 'products', 'orders', 'payments', 'workorders', 'inventory', 'procurement', 'lab', 'dispatch', 'machines', 'attendance'],
+      'Purchase & Store': ['dashboard', 'approvals', 'inventory', 'procurement', 'attendance']
     },
     users: [
       { id: 'U1', name: 'Admin', role: 'Super Admin', salary: 0 },
-      { id: 'U2', name: 'Nirav', role: 'Production Head', salary: 85000 },
+      { id: 'U2', name: 'Nirav', role: 'Production Head', salary: 85000, divs: ['CHEM', 'AGRO', 'SPC'] },
       { id: 'U3', name: 'Jagruti', role: 'Marketing Head', salary: 85000 },
       { id: 'U4', name: 'Rohan Shah', role: 'Sales Executive', salary: 28000 },
       { id: 'U5', name: 'Priya Mehta', role: 'Sales Executive', salary: 26000, intern: true, joined: addDays(t, -40) },
       { id: 'U6', name: 'Kunal Desai', role: 'Lab / R&D', salary: 42000 },
       { id: 'U7', name: 'Hetal Joshi', role: 'HR', salary: 38000 },
-      { id: 'U8', name: 'Mahesh Patel', role: 'Accounts', salary: 40000 }
+      { id: 'U8', name: 'Mahesh Patel', role: 'Accounts', salary: 40000 },
+      { id: 'U9', name: 'Vikram Rao', role: 'Purchase & Store', salary: 30000 },
+      { id: 'U10', name: 'Chem Team', role: 'Company Login', salary: 0, divs: ['CHEM'] },
+      { id: 'U11', name: 'Agro Team', role: 'Company Login', salary: 0, divs: ['AGRO'] },
+      { id: 'U12', name: 'Spc Team', role: 'Company Login', salary: 0, divs: ['SPC'] },
+      { id: 'U13', name: 'Flexipack Team', role: 'Company Login', salary: 0, divs: ['PACK'] }
     ],
     products: [
       { id: 'P1', div: 'CHEM', name: 'Crude Oil Demulsifier', code: 'IMP-DM-210', alias: 'Surfactant Blend SB-210', unit: 'kg', price: 185, usd: 2.4, moq: 500, density: 0.96, haz: true, make: true },
@@ -88,8 +95,8 @@ function seed() {
     ],
     market: { 'RM-101': 145, 'RM-102': 80, 'RM-103': 205, 'RM-104': 38, 'RM-105': 120, 'PK-201': 1500, 'PK-202': 185, 'RM-301': 9.5, 'RM-302': 23, 'RM-303': 40 },
     pos: [
-      { id: 'PO-7001', vendor: 'V2', code: 'RM-102', qty: 3000, unit: 'L', rate: 78, date: addDays(t, -10), status: 'Received' },
-      { id: 'PO-7002', vendor: 'V1', code: 'RM-101', qty: 2000, unit: 'kg', rate: 142, date: addDays(t, -30), status: 'Received' }
+      { id: 'PO-7001', div: 'CHEM', vendor: 'V2', code: 'RM-102', qty: 3000, unit: 'L', rate: 78, date: addDays(t, -10), status: 'Received' },
+      { id: 'PO-7002', div: 'CHEM', vendor: 'V1', code: 'RM-101', qty: 2000, unit: 'kg', rate: 142, date: addDays(t, -30), status: 'Received' }
     ],
     formulations: [
       { batch: 'F-DM-210-07', div: 'CHEM', productId: 'P1', client: 'Gulf Petro Services', version: 'Combination 2 of 4', date: addDays(t, -380), approved: true,
@@ -103,11 +110,11 @@ function seed() {
       { id: 'SMP-301', div: 'CHEM', client: 'Nile Oilfield Co', type: 'Crude oil sample (inward)', received: addDays(t, -4), stage: 2, tests: 'BS&W 12%, API 28', batches: ['F-HS-404-01'] }
     ],
     machines: [
-      { id: 'M1', name: 'Reactor R-1 (5 KL)', last: addDays(t, -50), every: 60, avgHrs: 6, avgCost: 18000, log: [] },
-      { id: 'M2', name: 'Blending Vessel B-2', last: addDays(t, -20), every: 45, avgHrs: 3, avgCost: 7000, log: [] },
-      { id: 'M3', name: 'Drum Filling Line', last: addDays(t, -88), every: 90, avgHrs: 4, avgCost: 9500, log: [] },
-      { id: 'M5', name: 'Thiosulphate Reactor (Agro, 1500 MT/month)', last: addDays(t, -35), every: 45, avgHrs: 8, avgCost: 22000, log: [] },
-      { id: 'M4', name: 'Pouch Laminator (Flexipack)', last: addDays(t, -10), every: 30, avgHrs: 5, avgCost: 12000, log: [] }
+      { id: 'M1', div: 'CHEM', name: 'Reactor R-1 (5 KL)', last: addDays(t, -50), every: 60, avgHrs: 6, avgCost: 18000, log: [] },
+      { id: 'M2', div: 'CHEM', name: 'Blending Vessel B-2', last: addDays(t, -20), every: 45, avgHrs: 3, avgCost: 7000, log: [] },
+      { id: 'M3', div: 'CHEM', name: 'Drum Filling Line', last: addDays(t, -88), every: 90, avgHrs: 4, avgCost: 9500, log: [] },
+      { id: 'M5', div: 'AGRO', name: 'Thiosulphate Reactor (Agro, 1500 MT/month)', last: addDays(t, -35), every: 45, avgHrs: 8, avgCost: 22000, log: [] },
+      { id: 'M4', div: 'PACK', name: 'Pouch Laminator (Flexipack)', last: addDays(t, -10), every: 30, avgHrs: 5, avgCost: 12000, log: [] }
     ],
     tasks: [
       { id: 'T1', user: 'U4', date: t, title: 'Follow up Gulf Petro: 70% balance', done: false, tag: 'U8' },
@@ -760,7 +767,7 @@ function bestVendor(code) {
 function quickPO(code, qty) {
   const b = bestVendor(code), i = rm(code);
   if (!b) return toast('No approved vendor for ' + code);
-  S.pos.unshift({ id: nextNo('PO'), vendor: b.v.id, code, qty, unit: i.unit, rate: b.rate, date: today(), status: 'Ordered' });
+  S.pos.unshift({ id: nextNo('PO'), div: i.div, vendor: b.v.id, code, qty, unit: i.unit, rate: b.rate, date: today(), status: poStatus(), by: me().name });
   closeModal(); toast(`PO sent to ${b.v.name} via ${b.v.channel} (simulated)`); rerender();
 }
 function rmForm() {
@@ -800,7 +807,7 @@ function vendorForm() {
 function poForm() {
   modal('Manual PO (e.g. Bhavin Packaging)', `<div class="form"><label>Vendor<select id="pv">${S.vendors.filter(v => v.approved).map(v => `<option value="${v.id}">${v.name}</option>`)}</select></label><label>Material<select id="pm2">${S.inventory.map(i => `<option value="${i.code}">${i.name}</option>`)}</select></label>
     <label>Qty<input id="pq" type="number" value="100"></label><label>Rate ₹<input id="pr" type="number" value="100"></label></div>`,
-    `<button class="btn p" onclick="(()=>{S.pos.unshift({id:nextNo('PO'),vendor:val('pv'),code:val('pm2'),qty:+val('pq'),unit:rm(val('pm2')).unit,rate:+val('pr'),date:today(),status:'Ordered'});closeModal();rerender()})()">Create PO</button>`);
+    `<button class="btn p" onclick="(()=>{S.pos.unshift({id:nextNo('PO'),div:rm(val('pm2')).div,vendor:val('pv'),code:val('pm2'),qty:+val('pq'),unit:rm(val('pm2')).unit,rate:+val('pr'),date:today(),by:me().name,status:poStatus()||'Ordered'});closeModal();rerender()})()">Create PO</button>`);
 }
 
 /* Lab */

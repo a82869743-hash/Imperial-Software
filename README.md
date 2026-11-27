@@ -16,6 +16,23 @@ If `ADMIN_PASSWORD` isn't set, a random password is printed in the console on fi
 On first sign-in the admin chooses **Start empty** or **Load demo data**. Demo staff sign in with their
 first name, e.g. `rohan@imperial.demo`, password `imperial-demo`.
 
+## Logins
+
+| Login | Who | Sees |
+|---|---|---|
+| Main login (Super Admin) | Owner | Every company and section, every approval in the group, all settings |
+| Company Login | One shared login per company | Only its own company's orders, stock, production, dispatch and machines |
+| Production Head | Nirav Sir | CHEM, AGRO and SPC together |
+| Marketing Head, Accounts, HR | Jagruti Mam and teams | Whole group |
+| Purchase & Store, Lab / R&D, Sales, interns | Staff | Their own section |
+
+Each login opens on its own dashboard. The **Approvals** page lists what that login approves
+(work orders, purchase orders, rejected deliveries, QA release, leave, test audits); the main login sees and can act on all of them.
+Company access is set per user in Admin → Users ("Company access"). Leave every company unticked for a group-wide login.
+The server enforces the lock: a company login never receives another company's records and cannot save them.
+
+Demo company logins: `chem@`, `agro@`, `spc@`, `flexipack@imperial.demo` (password `imperial-demo`).
+
 ## Run with Docker (any server or cloud)
 
 ```bash
